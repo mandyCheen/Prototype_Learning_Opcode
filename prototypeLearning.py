@@ -132,10 +132,14 @@ def prototypical_loss(input, target, n_support):
     target_inds = torch.arange(0, n_classes)
     target_inds = target_inds.view(n_classes, 1, 1)
     target_inds = target_inds.expand(n_classes, n_query, 1).long()
-    loss_val = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
     _, y_hat = log_p_y.max(2)
-
-
+    # loss_val = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
+    log_p_y = log_p_y.view(-1, n_classes)
+    target_ = target_inds.reshape(-1).squeeze()
+    # print(log_p_y.shape, target_.shape)
+    nll_loss = nn.NLLLoss()
+    loss_val = nll_loss(log_p_y, target_)
+    
     acc_val = y_hat.eq(target_inds.squeeze(2)).float().mean()
     
     return loss_val,  acc_val, prototypes, classes, query_samples, target_inds, y_hat
@@ -208,30 +212,13 @@ def nn_prototypical_loss(input, target, n_support, ce_weight=0.5, margin=2.0):
     target_inds = torch.arange(0, n_classes)
     target_inds = target_inds.view(n_classes, 1, 1)
     target_inds = target_inds.expand(n_classes, n_query, 1).long()
-    loss_val = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
     _, y_hat = log_p_y.max(2)
-
-    # # 計算 cross entropy loss
-    # ce_target = torch.arange(n_classes).repeat_interleave(n_query)
-    # ce_loss = F.cross_entropy(-closest_dists, ce_target)
+    # loss_val = -log_p_y.gather(2, target_inds).squeeze().view(-1).mean()
+    log_p_y = log_p_y.view(-1, n_classes)
+    target_ = target_inds.reshape(-1).squeeze()
+    nll_loss = nn.NLLLoss()
+    loss_val = nll_loss(log_p_y, target_)
     
-    # # 結合兩種 loss
-    # combined_loss = (1 - ce_weight) * proto_loss + ce_weight * ce_loss
-    # 創建標籤矩陣
-
-    # labels = torch.zeros_like(closest_dists)
-    # for i, c in enumerate(classes):
-    #     labels[i * n_query : (i + 1) * n_query, i] = 1
-    # # 計算 contrastive loss
-    # positive_loss = (labels * closest_dists.pow(2)).sum(1)
-    # negative_loss = ((1 - labels) * F.relu(margin - closest_dists).pow(2)).sum(1)
-    # loss_val = (positive_loss + negative_loss).mean()
-
-    # # 計算準確率
-    # _, y_hat = closest_dists.min(1)
-    # target_inds = torch.arange(0, n_classes).repeat_interleave(n_query)
-    # acc_val = y_hat.eq(target_inds).float().mean()
-
     acc_val = y_hat.eq(target_inds.squeeze(2)).float().mean()
 
     return loss_val, acc_val, prototypes, classes, query_samples, target_inds, y_hat
@@ -331,40 +318,40 @@ def get_prototypes(model, dataloader, support_shots):
     print(prototypes.keys())
     return prototypes
 
-def prototypical_loss_test(input, target, n_support):
-    target_cpu = target.to('cpu')
-    input_cpu = input.to('cpu')
+# def prototypical_loss_test(input, target, n_support):
+#     target_cpu = target.to('cpu')
+#     input_cpu = input.to('cpu')
 
-    def supp_idxs(c):
-        return target_cpu.eq(c).nonzero()[:n_support].squeeze(1)
+#     def supp_idxs(c):
+#         return target_cpu.eq(c).nonzero()[:n_support].squeeze(1)
 
-    classes = torch.unique(target_cpu)
-    n_classes = len(classes)
+#     classes = torch.unique(target_cpu)
+#     n_classes = len(classes)
 
-    support_idxs = list(map(supp_idxs, classes))
+#     support_idxs = list(map(supp_idxs, classes))
 
-    prototypes = torch.stack([input_cpu[idx_list].mean(0) for idx_list in support_idxs])
+#     prototypes = torch.stack([input_cpu[idx_list].mean(0) for idx_list in support_idxs])
 
-    query_idxs = []
-    n_queries = []
-    for c in classes:
-        class_idxs = target_cpu.eq(c).nonzero().squeeze(1)
-        n_query = len(class_idxs) - n_support
-        n_queries.append(n_query)
-        query_idxs.extend(class_idxs[n_support:])
-    # print(query_idxs)
-    query_samples = input_cpu[query_idxs]
-    dists = euclidean_dist(query_samples, prototypes)
+#     query_idxs = []
+#     n_queries = []
+#     for c in classes:
+#         class_idxs = target_cpu.eq(c).nonzero().squeeze(1)
+#         n_query = len(class_idxs) - n_support
+#         n_queries.append(n_query)
+#         query_idxs.extend(class_idxs[n_support:])
+#     # print(query_idxs)
+#     query_samples = input_cpu[query_idxs]
+#     dists = euclidean_dist(query_samples, prototypes)
 
-    log_p_y = F.log_softmax(-dists, dim=1)
+#     log_p_y = F.log_softmax(-dists, dim=1)
 
-    target_inds = torch.cat([torch.full((n_query,), i, dtype=torch.long) for i, n_query in enumerate(n_queries)])
+#     target_inds = torch.cat([torch.full((n_query,), i, dtype=torch.long) for i, n_query in enumerate(n_queries)])
 
-    loss_val = -log_p_y.gather(1, target_inds.unsqueeze(1)).squeeze().mean()
-    _, y_hat = log_p_y.max(1)
-    acc_val = y_hat.eq(target_inds).float().mean()
+#     loss_val = -log_p_y.gather(1, target_inds.unsqueeze(1)).squeeze().mean()
+#     _, y_hat = log_p_y.max(1)
+#     acc_val = y_hat.eq(target_inds).float().mean()
     
-    return loss_val, acc_val, prototypes, classes, query_samples, target_inds, y_hat
+#     return loss_val, acc_val, prototypes, classes, query_samples, target_inds, y_hat
 
 def get_original_prototype(dataNp: np.array, clusterLabel: np.array) -> np.array:
 	unique = np.unique(clusterLabel)

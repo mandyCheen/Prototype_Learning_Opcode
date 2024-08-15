@@ -10,6 +10,8 @@ from sklearn.preprocessing import LabelEncoder
 
 from malwareDetector import malwareDetector
 from dataLoader import DatasetLoad
+from gensim.models import Word2Vec
+
 
 class OpcodeVectorizer:
     def __init__(self, detector, dataset, method = "tfidf"):
@@ -22,12 +24,15 @@ class OpcodeVectorizer:
         self.trainDataset, self.testDataset, self.valDataset = dataset.trainData, dataset.testData, dataset.valData
         self.vectorize_func = self._get_vectorize_func()
         self.embedInfo = None
-        self.dataPath = "./data_5_9_4/"
+        self.dataPath = "./data_5_9_4_exe/"
 
     def _get_vectorize_func(self) -> Any:
         if self.vectorize_method == "tfidf":
             print("Vectorizing byte sequence using TF-IDF.")
             return self.vectorize_tfidf
+        elif self.vectorize_method == "word2vec":
+            print("Vectorizing byte sequence using Word2Vec.")
+            return self.vectorize_word2vec
         else:
             warnings.warn(f"Unsupported vectorize method: {self.vectorize_method}. Defaulting to TF-IDF.", RuntimeWarning)
             return self.vectorize_tfidf
@@ -114,6 +119,69 @@ class OpcodeVectorizer:
             self._save_pickle(path, d)
 
         return data
+    
+    def vectorize_word2vec(self, sentenceLen: int, window: int, min_count: int) -> Tuple[np.ndarray, ...]:
+        self.embedInfo = f"{sentenceLen}_{window}_{min_count}"
+        file_paths = self._get_file_paths()
+
+        if not os.path.exists(self.embeddingFolder):
+            os.makedirs(self.embeddingFolder)
+        
+        if self._check_files_exist(file_paths[:]):  
+            print(f"Loading vectorized opcode from {self.embeddingFolder}...")
+            return tuple(self._load_pickle(path) for path in file_paths if os.path.exists(path))
+        
+        print(f"Vectorizing opcode and saving to {self.embeddingFolder}...")
+        val_opcode, y_val, val_label_mapping = None, None, None
+        train_opcode = self.loadOpcodeDataArray(self.trainDataset)
+        test_opcode = self.loadOpcodeDataArray(self.testDataset)
+        y_train = self.trainDataset['family'].values
+        y_test = self.testDataset['family'].values
+        val_opcode = self.loadOpcodeDataArray(self.valDataset) if self.valDataset is not None else None
+        y_val = self.valDataset['family'].values if self.valDataset is not None else None
+        
+        le_train, le_test, le_val = LabelEncoder(), LabelEncoder(), LabelEncoder()
+
+        y_train_label, y_test_label, y_val_label = le_train.fit_transform(y_train), le_test.fit_transform(y_test), le_val.fit_transform(y_val) if y_val is not None else None
+
+        train_label_mapping = dict(enumerate(le_train.classes_))
+        test_label_mapping = dict(enumerate(le_test.classes_))
+        val_label_mapping = dict(enumerate(le_val.classes_)) if y_val is not None else None
+
+        if not os.path.exists(f"{self.embeddingFolder}/word2vec_{self.embedInfo}.model"):
+            print("Training Word2Vec model...")
+            model = Word2Vec(sentences=train_opcode, vector_size=100, window=window, min_count=min_count, workers=4)
+            print("Training Word2Vec model done.")
+            model.save(f"{self.embeddingFolder}/word2vec_{self.embedInfo}.model")
+        else:
+            print("Loading Word2Vec model...")
+            model = Word2Vec.load(f"{self.embeddingFolder}/word2vec_{self.embedInfo}.model")
+        
+        vectorzie_train = np.array([np.mean([model.wv[word] for word in words if word in model.wv] or [np.zeros(100)], axis=0) for words in train_opcode])
+        vectorzie_test = np.array([np.mean([model.wv[word] for word in words if word in model.wv] or [np.zeros(100)], axis=0) for words in test_opcode])
+        vectorzie_train = vectorzie_train[:, :sentenceLen]
+        vectorzie_test = vectorzie_test[:, :sentenceLen]
+        if val_opcode is not None:
+            vectorzie_val = np.array([np.mean([model.wv[word] for word in words if word in model.wv] or [np.zeros(100)], axis=0) for words in val_opcode])
+            vectorzie_val = vectorzie_val[:, :sentenceLen]
+
+        print("Vectorizing byte sequence done.")
+        print("Vectorizing byte sequence done.")
+        print(f"vectorzie_train shape: {vectorzie_train.shape}")
+        print(f"vectorzie_test shape: {vectorzie_test.shape}")
+        print(f'train_label_mapping: {train_label_mapping}')
+        print(f'test_label_mapping: {test_label_mapping}')
+        if vectorzie_val is not None:
+            print(f"vectorzie_val shape: {vectorzie_val.shape}")
+            print(f'val_label_mapping: {val_label_mapping}')
+
+        data = (vectorzie_train, vectorzie_test, vectorzie_val, y_train_label, y_test_label, y_val_label, 
+                train_label_mapping, test_label_mapping, val_label_mapping)
+
+        for path, d in zip(file_paths, data):
+            self._save_pickle(path, d)
+
+        return data
 
     def loadOpcodeData(self, data: pd.DataFrame):
         returnValue = None
@@ -127,8 +195,21 @@ class OpcodeVectorizer:
                 if returnValue is None:
                     returnValue = [opcode]
                 else:
-                    returnValue.append(opcode)    
-        print(len(returnValue))        
+                    returnValue.append(opcode)         
+        return returnValue
+
+    def loadOpcodeDataArray(self, data: pd.DataFrame):
+        returnValue = None
+        for i in range(len(data)):
+            cpu = data.iloc[i]["CPU"]
+            family = data.iloc[i]["family"]
+            filePath = f"{self.dataPath}/{cpu}/{family}/{data.iloc[i]['file_name']}.txt"
+            with open(filePath, "r") as f:
+                opcode = f.read().split()
+                if returnValue is None:
+                    returnValue = [opcode]
+                else:
+                    returnValue.append(opcode)           
         return returnValue
 
 

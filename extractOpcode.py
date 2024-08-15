@@ -8,8 +8,8 @@ import time
 
 DATASET_PATH = "/home/mandy900619/data/Malware202403_info.csv"
 DATASET_FOLDER = "/home/mandy900619/data/Malware202403/"
-ERROR_PATH = "./log/error_5_9_4.log"
-DUPLICATE_PATH = "./log/duplicate_5_9_4.log"
+ERROR_PATH = "./log/error_5_9_4_exe.log"
+DUPLICATE_PATH = "./log/duplicate_5_9_4_exe.log"
 MAX_FILES_PER_FAMILY = 20
 MAX_WORKERS = 15
 SEED = 7
@@ -37,7 +37,7 @@ def process_row(row, files_counter, family_counters, family_hashes):
     cpu = row.CPU
     family = row.family
     file_name = row.file_name
-    output_folder = f"./data_5_9_4/{cpu}/{family}/"
+    output_folder = f"./data_5_9_4_exe/{cpu}/{family}/"
     output_path = os.path.join(output_folder, f"{file_name}.txt")
 
     key = f"{cpu}/{family}"
@@ -62,8 +62,9 @@ def process_row(row, files_counter, family_counters, family_hashes):
         opcodes = ""
         if sections:
             for section in sections:
-                if section['size'] > 0:
-                    opcodes += opcodeAnalysis.cmd(f"pI {section['size']} @ {section['vaddr']} ~[0] ~!invalid")
+                if "-x" in section["perm"]: # Check if section is executable
+                    if section['size'] > 0:
+                        opcodes += opcodeAnalysis.cmd(f"pI {section['size']} @ {section['vaddr']} ~[0] ~!invalid")
             if opcodes == "":
                 open(ERROR_PATH, "a").write(f"{row.file_name} has no opcodes\n")
             else:
@@ -108,7 +109,7 @@ if __name__ == "__main__":
             if key not in family_counters:
                 family_counters[key] = 0
                 family_hashes[key] = manager.dict()
-            output_folder = f"./data_5_9_4/{key}/"
+            output_folder = f"./data_5_9_4_exe/{key}/"
             if os.path.exists(output_folder):
                 files = []
                 for file in os.listdir(output_folder):
@@ -122,16 +123,18 @@ if __name__ == "__main__":
                     dataset_unpacked = dataset_unpacked[~((dataset_unpacked['CPU'] == row.CPU) & (dataset_unpacked['family'] == row.family))]
             
         print("Existing files loaded.")
-        with open(ERROR_PATH, "r") as error_file:
-            file_errors = error_file.readlines()
-            error_files = [file.split(" ")[0] for file in file_errors]
-            print(f"Error files loaded: {len(error_files)}")
-            dataset_unpacked = dataset_unpacked[~dataset_unpacked['file_name'].isin(error_files)]
-        with open(DUPLICATE_PATH, "r") as duplicate_file:
-            file_duplicates = duplicate_file.readlines()
-            duplicate_files = [file.split(" ")[0] for file in file_duplicates]
-            print(f"Duplicate files loaded: {len(duplicate_files)}")
-            dataset_unpacked = dataset_unpacked[~dataset_unpacked['file_name'].isin(duplicate_files)]
+        if os.path.exists(ERROR_PATH):
+            with open(ERROR_PATH, "r") as error_file:
+                file_errors = error_file.readlines()
+                error_files = [file.split(" ")[0] for file in file_errors]
+                print(f"Error files loaded: {len(error_files)}")
+                dataset_unpacked = dataset_unpacked[~dataset_unpacked['file_name'].isin(error_files)]
+        if os.path.exists(DUPLICATE_PATH):
+            with open(DUPLICATE_PATH, "r") as duplicate_file:
+                file_duplicates = duplicate_file.readlines()
+                duplicate_files = [file.split(" ")[0] for file in file_duplicates]
+                print(f"Duplicate files loaded: {len(duplicate_files)}")
+                dataset_unpacked = dataset_unpacked[~dataset_unpacked['file_name'].isin(duplicate_files)]
         print("Processing files...")
         total = len(dataset_unpacked)
         print(f"Total files to process: {total}")

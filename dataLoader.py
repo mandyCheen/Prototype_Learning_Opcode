@@ -27,16 +27,16 @@ class DatasetLoad:
 
     def get_split_dataset(self) -> None: 
         if self.val:
-            trainRate, testRate, valRate = 0.6, 0.3, 0.1
+            testNum, valNum = 10, 10
         else:
-            trainRate, testRate, valRate = 0.7, 0.3, 0
+            testNum, valNum = 10, 0
         familyList = self.rawDataset["family"].unique()
         np.random.seed(self.seed)
         np.random.shuffle(familyList)
         
-        trainFamily = familyList[:int(len(familyList) * trainRate)]
-        testFamily = familyList[int(len(familyList) * trainRate):int(len(familyList) * (trainRate + testRate))]
-        valFamily = familyList[int(len(familyList) * (trainRate + testRate)):]
+        trainFamily = familyList[:int(len(familyList) - testNum - valNum)]
+        testFamily = familyList[int(len(familyList) - testNum - valNum):int(len(familyList) - valNum)]
+        valFamily = familyList[int(len(familyList) - valNum):]
         
         self.write_split_dataset("train", trainFamily)
         self.write_split_dataset("test", testFamily)
