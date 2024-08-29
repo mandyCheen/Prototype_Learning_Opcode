@@ -1,10 +1,10 @@
 dropperl
 jynx
-pkexecexploit
+poseidon
 fscan
 exploitscan
 bpfdoor
-sshdoor
+sutekh
 gost
 camelot
-revproxy
+sagnt

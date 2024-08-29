@@ -24,7 +24,7 @@ class OpcodeVectorizer:
         self.trainDataset, self.testDataset, self.valDataset = dataset.trainData, dataset.testData, dataset.valData
         self.vectorize_func = self._get_vectorize_func()
         self.embedInfo = None
-        self.dataPath = "./data_5_9_4_exe/"
+        self.dataPath = "./data_5_9_4_text/"
 
     def _get_vectorize_func(self) -> Any:
         if self.vectorize_method == "tfidf":
@@ -78,7 +78,7 @@ class OpcodeVectorizer:
         if self._check_files_exist(file_paths[:]):  
             print(f"Loading vectorized opcode from {self.embeddingFolder}...")
             return tuple(self._load_pickle(path) for path in file_paths if os.path.exists(path))
-
+        
         print(f"Vectorizing opcode and saving to {self.embeddingFolder}...")
 
         val_opcode, y_val, val_label_mapping = None, None, None
@@ -120,8 +120,8 @@ class OpcodeVectorizer:
 
         return data
     
-    def vectorize_word2vec(self, sentenceLen: int, window: int, min_count: int) -> Tuple[np.ndarray, ...]:
-        self.embedInfo = f"{sentenceLen}_{window}_{min_count}"
+    def vectorize_word2vec(self, vector_size: int, window: int, min_count: int) -> Tuple[np.ndarray, ...]:
+        self.embedInfo = f"{vector_size}_{window}_{min_count}"
         file_paths = self._get_file_paths()
 
         if not os.path.exists(self.embeddingFolder):
@@ -150,20 +150,16 @@ class OpcodeVectorizer:
 
         if not os.path.exists(f"{self.embeddingFolder}/word2vec_{self.embedInfo}.model"):
             print("Training Word2Vec model...")
-            model = Word2Vec(sentences=train_opcode, vector_size=100, window=window, min_count=min_count, workers=4)
+            model = Word2Vec(sentences=train_opcode, vector_size=vector_size, window=window, min_count=min_count, workers=24)
             print("Training Word2Vec model done.")
             model.save(f"{self.embeddingFolder}/word2vec_{self.embedInfo}.model")
         else:
             print("Loading Word2Vec model...")
-            model = Word2Vec.load(f"{self.embeddingFolder}/word2vec_{self.embedInfo}.model")
-        
-        vectorzie_train = np.array([np.mean([model.wv[word] for word in words if word in model.wv] or [np.zeros(100)], axis=0) for words in train_opcode])
-        vectorzie_test = np.array([np.mean([model.wv[word] for word in words if word in model.wv] or [np.zeros(100)], axis=0) for words in test_opcode])
-        vectorzie_train = vectorzie_train[:, :sentenceLen]
-        vectorzie_test = vectorzie_test[:, :sentenceLen]
+            model = Word2Vec.load(f"{self.embeddingFolder}/word2vec_{self.embedInfo}.model")    
+        vectorzie_train = np.array([np.mean([model.wv[word] for word in words if word in model.wv] or [np.zeros(vector_size)], axis=0) for words in train_opcode])
+        vectorzie_test = np.array([np.mean([model.wv[word] for word in words if word in model.wv] or [np.zeros(vector_size)], axis=0) for words in test_opcode])
         if val_opcode is not None:
-            vectorzie_val = np.array([np.mean([model.wv[word] for word in words if word in model.wv] or [np.zeros(100)], axis=0) for words in val_opcode])
-            vectorzie_val = vectorzie_val[:, :sentenceLen]
+            vectorzie_val = np.array([np.mean([model.wv[word] for word in words if word in model.wv] or [np.zeros(vector_size)], axis=0) for words in val_opcode])
 
         print("Vectorizing byte sequence done.")
         print("Vectorizing byte sequence done.")
@@ -209,7 +205,7 @@ class OpcodeVectorizer:
                 if returnValue is None:
                     returnValue = [opcode]
                 else:
-                    returnValue.append(opcode)           
+                    returnValue.append(opcode)  
         return returnValue
 
 

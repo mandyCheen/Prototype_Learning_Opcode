@@ -8,8 +8,8 @@ import time
 
 DATASET_PATH = "/home/mandy900619/data/Malware202403_info.csv"
 DATASET_FOLDER = "/home/mandy900619/data/Malware202403/"
-ERROR_PATH = "./log/error_5_9_4_exe.log"
-DUPLICATE_PATH = "./log/duplicate_5_9_4_exe.log"
+ERROR_PATH = "./log/error_5_9_4_text.log"
+DUPLICATE_PATH = "./log/duplicate_5_9_4_text.log"
 MAX_FILES_PER_FAMILY = 20
 MAX_WORKERS = 15
 SEED = 7
@@ -37,7 +37,7 @@ def process_row(row, files_counter, family_counters, family_hashes):
     cpu = row.CPU
     family = row.family
     file_name = row.file_name
-    output_folder = f"./data_5_9_4_exe/{cpu}/{family}/"
+    output_folder = f"./data_5_9_4_text/{cpu}/{family}/"
     output_path = os.path.join(output_folder, f"{file_name}.txt")
 
     key = f"{cpu}/{family}"
@@ -62,7 +62,7 @@ def process_row(row, files_counter, family_counters, family_hashes):
         opcodes = ""
         if sections:
             for section in sections:
-                if "-x" in section["perm"]: # Check if section is executable
+                if section['name'] == ".text": # Check if section is .text
                     if section['size'] > 0:
                         opcodes += opcodeAnalysis.cmd(f"pI {section['size']} @ {section['vaddr']} ~[0] ~!invalid")
             if opcodes == "":
@@ -109,7 +109,7 @@ if __name__ == "__main__":
             if key not in family_counters:
                 family_counters[key] = 0
                 family_hashes[key] = manager.dict()
-            output_folder = f"./data_5_9_4_exe/{key}/"
+            output_folder = f"./data_5_9_4_text/{key}/"
             if os.path.exists(output_folder):
                 files = []
                 for file in os.listdir(output_folder):

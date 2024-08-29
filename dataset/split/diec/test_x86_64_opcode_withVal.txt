@@ -1,10 +1,10 @@
 xmrig
-patpooty
+pnscan
 tsunami
 sshdkit
 hive
-prism
-reversessh
+psybnc
+rozena
 winnti
 cryptonote
 vtflooder
