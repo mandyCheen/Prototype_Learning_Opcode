@@ -260,10 +260,6 @@ def contrastive_loss(input, target, n_support, margin=2.0):
 
     return loss_val, acc_val, prototypes, classes, query_samples, target_inds, y_hat
 
-
-
-
-
 def prototypical_loss_using_proto(input, target, prototypes, label_mapping = None):
     # 修改原本的model使其不使用testing data計算prototypes
     target_cpu = target.to('cpu')
